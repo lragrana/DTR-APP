@@ -5,6 +5,7 @@ from flask_jwt_extended import create_access_token, get_jwt, jwt_required
 
 from audit import audit
 from extensions import bcrypt, get_db, limiter
+from routes.mfa import mfa_required_for, pending_token
 from security import (current_user, decrypt_field, encrypt_field, get_password, get_str, get_username,
                       hash_password, json_body, password_problems, verify_captcha)
 
@@ -84,6 +85,12 @@ def login():
             db.users.update_one({"_id": user["_id"]}, {"$set": update})
         audit("LOGIN_FAILED", user=username, success=False, detail=detail)
         return jsonify(error="Invalid username or password"), 401
+
+    # C1: admins and supervisors must pass a second factor before they get a session token.
+    if mfa_required_for(user):
+        audit("LOGIN_PASSWORD_OK_MFA_PENDING", user=username, role=user["role"])
+        return jsonify(mfa_required=True, mfa_enrolled=bool(user.get("mfa_enabled")),
+                       mfa_token=pending_token(user), expires_in=300), 200
 
     db.users.update_one({"_id": user["_id"]}, {"$set": {"failed_attempts": 0, "locked_until": None}})
     token = create_access_token(identity=username, additional_claims={"role": user["role"]})

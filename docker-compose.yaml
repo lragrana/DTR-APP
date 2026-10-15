@@ -24,22 +24,39 @@ services:
     restart: unless-stopped
     environment:
       MONGO_URI: mongodb://${APP_DB_USER}:${APP_DB_PASSWORD}@mongo:27017/dtr_database?authSource=dtr_database
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?set in .env}
-      FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY:?set in .env}
+      # C2: JWT and field encryption keys come from Vault (AppRole credentials below), not from .env.
+      VAULT_ADDR: http://vault:8200
       TURNSTILE_SECRET: ${TURNSTILE_SECRET:?set in .env}
       CORS_ORIGINS: https://localhost
       ADMIN_USERNAME: ${ADMIN_USERNAME:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    secrets: [vault_role_id, vault_secret_id]
     depends_on:
       mongo:
         condition: service_healthy
+      vault:
+        condition: service_started
     # No "ports:" – only nginx can reach the API.
-    networks: [db-net, web-net]
+    networks: [db-net, web-net, vault-net]
     read_only: true
     tmpfs:
       - /tmp
       - /home/appuser/.gunicorn:uid=10001,gid=10001,mode=700
     cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  vault:
+    image: hashicorp/vault:2.1.1
+    restart: unless-stopped
+    command: server
+    environment:
+      SKIP_SETCAP: "true"
+    volumes:
+      - vault-data:/vault/file
+      - vault-logs:/vault/logs
+      - ./vault/config:/vault/config:ro
+    # No "ports:" – only the backend can reach Vault, on an internal network.
+    networks: [vault-net]
     security_opt: ["no-new-privileges:true"]
 
   web:
@@ -60,6 +77,16 @@ networks:
   web-net:
   db-net:
     internal: true
+  vault-net:
+    internal: true
+
+secrets:
+  vault_role_id:
+    file: ./secrets/vault_role_id
+  vault_secret_id:
+    file: ./secrets/vault_secret_id
 
 volumes:
   mongo-data:
+  vault-data:
+  vault-logs:

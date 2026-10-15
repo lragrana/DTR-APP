@@ -1,12 +1,14 @@
 import { useCallback, useState } from "react";
 import { api, setToken } from "../api.js";
 import Captcha from "./Captcha.jsx";
+import MfaStep from "./MfaStep.jsx";
 
 export default function Login({ onLogin, onShowSignup }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [captcha, setCaptcha] = useState("");
   const [error, setError] = useState("");
+  const [mfa, setMfa] = useState(null);
   const onToken = useCallback((t) => setCaptcha(t), []);
 
   async function submit(e) {
@@ -17,11 +19,16 @@ export default function Login({ onLogin, onShowSignup }) {
         method: "POST",
         body: { username, password, captcha_token: captcha },
       });
+      if (data.mfa_required) { setMfa(data); return; }
       setToken(data.access_token);
       onLogin();
     } catch (err) {
       setError(err.message);
     }
+  }
+
+  if (mfa) {
+    return <MfaStep mfa={mfa} onDone={onLogin} onCancel={() => { setMfa(null); setPassword(""); }} />;
   }
 
   return (

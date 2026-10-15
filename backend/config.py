@@ -13,8 +13,8 @@ class Config:
     # Secrets come from the environment (.env / Docker), never from source code.
     MONGO_URI = _required("MONGO_URI")
     MONGO_DB = os.environ.get("MONGO_DB", "dtr_database")
-    JWT_SECRET_KEY = _required("JWT_SECRET_KEY")
-    FIELD_ENCRYPTION_KEY = _required("FIELD_ENCRYPTION_KEY")
+    # C2: the JWT signing key and the field encryption keys are loaded from Vault at startup (keyring.py).
+    VAULT_ADDR = _required("VAULT_ADDR")
     TURNSTILE_SECRET = _required("TURNSTILE_SECRET")
 
     # R-003: short-lived tokens, sent only in the Authorization header.

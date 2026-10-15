@@ -10,6 +10,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from flask import current_app, jsonify, request
 from flask_jwt_extended import get_jwt, get_jwt_identity, verify_jwt_in_request
 
+import keyring
 from extensions import bcrypt, get_db
 
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,32}$")
@@ -85,27 +86,26 @@ def hash_password(password):
     return bcrypt.generate_password_hash(password, rounds=12).decode()
 
 
-# ---------- field-level encryption (R-002): AES-256-GCM ----------
-
-def _aes():
-    key = base64.b64decode(current_app.config["FIELD_ENCRYPTION_KEY"])
-    if len(key) != 32:
-        raise RuntimeError("FIELD_ENCRYPTION_KEY must be 32 bytes (base64)")
-    return AESGCM(key)
-
+# ---------- field-level encryption (R-002 + C2): AES-256-GCM, keys from Vault ----------
 
 def encrypt_field(plaintext):
     if plaintext is None:
         return None
+    version, key = keyring.current_key()
     nonce = os.urandom(12)
-    return "v1:" + base64.b64encode(nonce + _aes().encrypt(nonce, plaintext.encode(), None)).decode()
+    return f"{version}:" + base64.b64encode(nonce + AESGCM(key).encrypt(nonce, plaintext.encode(), None)).decode()
 
 
 def decrypt_field(token):
     if not token:
         return None
-    raw = base64.b64decode(token[3:])
-    return _aes().decrypt(raw[:12], raw[12:], None).decode()
+    version, _, payload = token.partition(":")
+    raw = base64.b64decode(payload)
+    return AESGCM(keyring.key_for(version)).decrypt(raw[:12], raw[12:], None).decode()
+
+
+def key_version(token):
+    return token.partition(":")[0] if token else None
 
 
 # ---------- CAPTCHA (R-005): Cloudflare Turnstile ----------

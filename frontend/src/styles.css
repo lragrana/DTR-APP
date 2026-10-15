@@ -16,3 +16,5 @@ table { width: 100%; border-collapse: collapse; background: #fff; margin-bottom:
 th, td { text-align: left; padding: 8px; border-bottom: 1px solid #e4e7eb; font-size: 14px; }
 .confirm { margin-bottom: 16px; }
 .captcha { min-height: 65px; }
+.qr { width: 200px; height: 200px; align-self: center; background: #fff; }
+.codes { columns: 2; font-size: 15px; }

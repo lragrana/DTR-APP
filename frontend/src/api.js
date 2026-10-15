@@ -5,9 +5,10 @@ export const getToken = () => sessionStorage.getItem(TOKEN_KEY);
 export const setToken = (t) => sessionStorage.setItem(TOKEN_KEY, t);
 export const clearToken = () => sessionStorage.removeItem(TOKEN_KEY);
 
-export async function api(path, { method = "GET", body } = {}) {
+export async function api(path, { method = "GET", body, token: explicitToken } = {}) {
   const headers = { "Content-Type": "application/json" };
-  const token = getToken();
+  // The MFA step passes its short-lived pending token explicitly; it is never stored.
+  const token = explicitToken || getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`/api${path}`, {
     method,
@@ -15,7 +16,7 @@ export async function api(path, { method = "GET", body } = {}) {
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && token && !path.startsWith("/auth/login")) {
+  if (res.status === 401 && token && !explicitToken && !path.startsWith("/auth/login")) {
     clearToken();
     window.dispatchEvent(new Event("dtr:logout"));
   }

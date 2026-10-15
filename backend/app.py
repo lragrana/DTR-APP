@@ -1,22 +1,27 @@
 import logging
 from datetime import datetime, timezone
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+import keyring
 from config import Config
 from extensions import bcrypt, get_db, init_db, jwt, limiter
 from routes.admin import admin_bp
 from routes.attendance import attendance_bp
 from routes.auth import auth_bp
+from routes.mfa import mfa_bp
 from security import ValidationError, hash_password, password_problems
 
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+    # C2: fail closed – without Vault the app has no keys and does not start.
+    keyring.load()
+    app.config["JWT_SECRET_KEY"] = keyring.jwt_signing_key()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     # nginx is the only proxy in front of the app; trust exactly one hop.
@@ -31,6 +36,16 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(attendance_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(mfa_bp)
+
+    @jwt.token_verification_loader
+    def mfa_gate(_header, payload):
+        # C1: an "MFA pending" token only works on the MFA endpoints, never on the rest of the API.
+        return not payload.get("mfa_pending") or request.blueprint == "mfa"
+
+    @jwt.token_verification_failed_loader
+    def mfa_not_completed(_header, _payload):
+        return jsonify(error="Multi-factor authentication is required"), 401
 
     @jwt.token_in_blocklist_loader
     def token_revoked(_header, payload):

@@ -6,3 +6,6 @@ flask-jwt-extended
 flask-limiter
 cryptography
 gunicorn
+pyotp
+qrcode
+hvac

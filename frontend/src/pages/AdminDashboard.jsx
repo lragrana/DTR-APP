@@ -21,10 +21,12 @@ export default function AdminDashboard({ user }) {
   const [users, setUsers] = useState([]);
   const [pending, setPending] = useState(null);
   const [msg, setMsg] = useState("");
+  const [keys, setKeys] = useState(null);
 
   const load = () => {
     api("/attendance").then(setRecords).catch((e) => setMsg(e.message));
     if (isAdmin) api("/admin/users").then(setUsers).catch((e) => setMsg(e.message));
+    if (isAdmin) api("/admin/keys").then(setKeys).catch((e) => setMsg(e.message));
   };
   useEffect(() => { load(); }, []);
 
@@ -34,7 +36,9 @@ export default function AdminDashboard({ user }) {
     try {
       const data = p.type === "delete"
         ? await api(`/attendance/${p.record.id}`, { method: "DELETE", body: { password } })
-        : await api(`/admin/users/${encodeURIComponent(p.username)}/role`, { method: "PATCH", body: { role: p.role, password } });
+        : p.type === "rotate"
+          ? await api("/admin/keys/rotate", { method: "POST", body: { password } })
+          : await api(`/admin/users/${encodeURIComponent(p.username)}/role`, { method: "PATCH", body: { role: p.role, password } });
       setMsg(data.message);
       load();
     } catch (e) {
@@ -46,7 +50,9 @@ export default function AdminDashboard({ user }) {
     <section>
       {pending && (
         <ConfirmPassword
-          title={pending.type === "delete" ? `Delete the record of ${pending.record.username}?` : `Change ${pending.username} to ${pending.role}?`}
+          title={pending.type === "delete" ? `Delete the record of ${pending.record.username}?`
+            : pending.type === "rotate" ? "Rotate the field encryption key? All encrypted data will be re-encrypted with a new key."
+              : `Change ${pending.username} to ${pending.role}?`}
           onConfirm={confirm}
           onCancel={() => setPending(null)}
         />
@@ -58,7 +64,7 @@ export default function AdminDashboard({ user }) {
         <>
           <h2>Users and roles</h2>
           <table>
-            <thead><tr><th>User</th><th>Role</th><th>Locked</th></tr></thead>
+            <thead><tr><th>User</th><th>Role</th><th>MFA</th><th>Locked</th></tr></thead>
             <tbody>
               {users.map((u) => (
                 <tr key={u.username}>
@@ -71,11 +77,19 @@ export default function AdminDashboard({ user }) {
                       <option value="admin">admin</option>
                     </select>
                   </td>
+                  <td>{u.mfa ? "on" : u.role === "intern" ? "–" : "not set up"}</td>
                   <td>{u.locked ? "yes" : "no"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <h2>Encryption keys (Vault)</h2>
+          {keys && (
+            <div className="actions">
+              <span>Current key: <b>{keys.current}</b> · versions in Vault: {keys.versions.join(", ")} · encrypted values: {Object.entries(keys.encrypted_values_by_version).map(([v, n]) => `${v}=${n}`).join(", ") || "none"}</span>
+              <button className="danger" onClick={() => setPending({ type: "rotate" })}>Rotate key</button>
+            </div>
+          )}
         </>
       )}
     </section>
