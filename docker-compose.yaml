@@ -1,33 +1,65 @@
-version: '3.8'
-
 services:
-  backend:
-    build: ./backend
-    ports:
-      - "5000:5000"
-    environment:
-      - FLASK_ENV=development
-      - MONGO_URI=mongodb://aadinnr:secret@mongo:27017/
-    depends_on:
-      - mongo
-
-  frontend:
-    build: ./frontend
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
-
   mongo:
-    image: mongo
-    restart: always
+    image: mongo:8.0
+    restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: aadinnr
-      MONGO_INITDB_ROOT_PASSWORD: secret
-    ports:
-      - "27017:27017"
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:?set in .env}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?set in .env}
+      APP_DB_USER: ${APP_DB_USER:?set in .env}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?set in .env}
     volumes:
       - mongo-data:/data/db
+      - ./mongo/init:/docker-entrypoint-initdb.d:ro
+    # No "ports:" – the database is reachable only from the backend on a private network.
+    networks: [db-net]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    security_opt: ["no-new-privileges:true"]
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      MONGO_URI: mongodb://${APP_DB_USER}:${APP_DB_PASSWORD}@mongo:27017/dtr_database?authSource=dtr_database
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?set in .env}
+      FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY:?set in .env}
+      TURNSTILE_SECRET: ${TURNSTILE_SECRET:?set in .env}
+      CORS_ORIGINS: https://localhost
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    # No "ports:" – only nginx can reach the API.
+    networks: [db-net, web-net]
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /home/appuser/.gunicorn:uid=10001,gid=10001,mode=700
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        VITE_TURNSTILE_SITEKEY: ${TURNSTILE_SITEKEY:-1x00000000000000000000AA}
+    restart: unless-stopped
+    ports:
+      - "80:8080"
+      - "443:8443"
+    depends_on: [backend]
+    networks: [web-net]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+networks:
+  web-net:
+  db-net:
+    internal: true
 
 volumes:
   mongo-data:
