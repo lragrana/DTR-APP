@@ -17,6 +17,31 @@ A step-by-step anyone can follow start to finish. **The two things we are provin
 
 ---
 
+## 0b. Windows only — install WSL2 + Docker Desktop (do this first)
+
+Docker Desktop on Windows runs on **WSL2**, which needs the **"Virtual Machine Platform"** Windows feature. If the Docker installer fails with *"Virtual Machine Platform … is not enabled on this machine,"* this is the fix. **Steps 1–3 need administrator rights.**
+
+1. **Open PowerShell as Administrator:** right-click **Start** → **Terminal (Admin)** (or **Windows PowerShell (Admin)**) → **Yes**.
+2. **Enable WSL2 + install Ubuntu:**
+   ```powershell
+   wsl --install
+   ```
+   (turns on *Virtual Machine Platform* + *WSL2* and installs Ubuntu). If it says WSL is already installed, run `wsl --install -d Ubuntu` instead.
+3. **Restart the PC** — required; the feature only turns on after a reboot.
+4. **Install Docker Desktop:** download from https://www.docker.com/products/docker-desktop, run the installer (keep **"Use WSL 2"** checked), launch it, and **skip the sign-in** — no Docker account is needed.
+5. **Confirm it's running:** the Docker whale icon in the system tray should read "Docker Desktop is running."
+6. **Run the project inside Ubuntu, not PowerShell:** open **Ubuntu** from the Start menu (that's the WSL2 terminal). It already has `bash`, `git`, `openssl` and `python3`. Do the `git clone` and `sh scripts/setup.sh` steps **there**.
+
+**If you don't have admin rights:**
+- Ask whoever administers the laptop to run `wsl --install` once (steps 1–3).
+- Also check that **virtualization (Intel VT-x / AMD-V) is enabled in BIOS/UEFI** — WSL2 needs it.
+- If it still won't work, **run the demo from a machine that does have Docker** — only one laptop needs to run the live app for the TA.
+
+> **Mac:** no WSL needed — just install Docker Desktop for Mac and skip the sign-in.
+> **No Docker account is required** to build or run this project.
+
+---
+
 ## 1. Get the code
 
 ```sh
