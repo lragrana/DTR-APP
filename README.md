@@ -29,7 +29,22 @@ Only `web` is reachable from your machine; the database and Vault sit on interna
   on the host — the setup scripts use them.
 - A web browser.
 
-## How to run (first time)
+## Quick start (one command)
+First time, from the project root, just run:
+
+```sh
+sh scripts/setup.sh     # creates .env, inits + unseals Vault, builds and starts everything
+```
+
+Every time after that (or after a reboot):
+
+```sh
+sh scripts/start.sh     # starts the stack, unseals Vault, restarts the backend
+```
+
+Then open **https://localhost**. Prefer to run the steps by hand? They're spelled out below.
+
+## How to run (first time, step by step)
 Run everything from the project root (`DTR-APP/`):
 
 ```sh
